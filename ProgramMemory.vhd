@@ -78,52 +78,52 @@ begin
 					state <= RUNNING;
 				when RUNNING =>
 				    if read_enable = '1' then
-                        case local_address is
+                        case to_integer(unsigned(local_address)) is
                             -- Read instruction
-                            when x"0" =>
+                            when 0 =>
                                 data_out <= store(to_integer(unsigned(program_counter)));
                                 program_counter <= program_counter + 1;
                             -- Read program counter
-                            when x"1" =>
+                            when 1 =>
                                 data_out <= program_counter;
                             -- Read write counter
-                            when x"2" =>
+                            when 2 =>
                                 data_out <= write_counter;
                             -- Read jump register
-                            when x"3" =>
+                            when 3 =>
                                 data_out <= jump_register;
                             when others =>
                             
                         end case;
 				    elsif write_enable = '1' then
-                        case local_address is
+                        case to_integer(unsigned(local_address)) is
                             -- Write instruction
-                            when x"0" =>
+                            when 0 =>
                                 store(to_integer(unsigned(write_counter))) <= data_in;
                                 write_counter <= write_counter + 1;
                             -- Write program counter
-                            when x"1" =>
+                            when 1 =>
                                 program_counter <= data_in;
                             -- Write write counter
-                            when x"2" =>
+                            when 2 =>
                                 write_counter <= data_in;
                             -- Write write counter
-                            when x"3" =>
+                            when 3 =>
                                 jump_register <= data_in;
                             -- Jump if zero
-                            when x"4" =>
+                            when 4 =>
                                 if ieee.std_logic_unsigned."=" (data_in, x"0000") then
                                     program_counter <= jump_register;
                                 end if;
                             -- Jump if non-zero
-                            when x"5" =>
+                            when 5 =>
                                 if ieee.std_logic_unsigned."/=" (data_in, x"0000") then
                                     program_counter <= jump_register;
                                 end if;
                             when others =>
                             
                         end case;
-				    end if;				    
+				    end if;
 				when DONE =>
 					state <= IDLE;
 				when others =>
