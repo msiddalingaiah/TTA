@@ -31,7 +31,7 @@ use ieee.numeric_std.all;
 entity ProgramMemory is
 	generic  (
 		DATA_WIDTH : integer := 16;
-        ADDRESS_WIDTH : integer := 4;
+        ADDRESS_WIDTH : integer := 3;
 		DEPTH : natural := 1024
 	);
 	port  (
@@ -53,7 +53,7 @@ signal store : MemoryType;
 signal program_counter : std_logic_vector(DATA_WIDTH-1 downto 0);
 signal jump_register : std_logic_vector(DATA_WIDTH-1 downto 0);
 signal write_counter : std_logic_vector(DATA_WIDTH-1 downto 0);
-signal local_address : std_logic_vector(4-1 downto 0);
+signal local_address : std_logic_vector(ADDRESS_WIDTH-1 downto 0);
 
 begin
 
@@ -79,44 +79,48 @@ begin
 				when RUNNING =>
 				    if read_enable = '1' then
                         case to_integer(unsigned(local_address)) is
-                            -- Read instruction
+                            -- NOP
                             when 0 =>
+                            -- Read instruction
+                            when 1 =>
                                 data_out <= store(to_integer(unsigned(program_counter)));
                                 program_counter <= program_counter + 1;
                             -- Read program counter
-                            when 1 =>
+                            when 2 =>
                                 data_out <= program_counter;
                             -- Read write counter
-                            when 2 =>
+                            when 3 =>
                                 data_out <= write_counter;
                             -- Read jump register
-                            when 3 =>
+                            when 4 =>
                                 data_out <= jump_register;
                             when others =>
                             
                         end case;
 				    elsif write_enable = '1' then
                         case to_integer(unsigned(local_address)) is
-                            -- Write instruction
+                            -- NOP
                             when 0 =>
+                            -- Write instruction
+                            when 1 =>
                                 store(to_integer(unsigned(write_counter))) <= data_in;
                                 write_counter <= write_counter + 1;
                             -- Write program counter
-                            when 1 =>
+                            when 2 =>
                                 program_counter <= data_in;
                             -- Write write counter
-                            when 2 =>
+                            when 3 =>
                                 write_counter <= data_in;
                             -- Write write counter
-                            when 3 =>
+                            when 4 =>
                                 jump_register <= data_in;
                             -- Jump if zero
-                            when 4 =>
+                            when 5 =>
                                 if ieee.std_logic_unsigned."=" (data_in, x"0000") then
                                     program_counter <= jump_register;
                                 end if;
                             -- Jump if non-zero
-                            when 5 =>
+                            when 6 =>
                                 if ieee.std_logic_unsigned."/=" (data_in, x"0000") then
                                     program_counter <= jump_register;
                                 end if;

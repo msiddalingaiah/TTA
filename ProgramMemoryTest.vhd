@@ -31,7 +31,7 @@ use ieee.numeric_std.all;
 entity ProgramMemoryTest is
     generic  (
         DATA_WIDTH : integer := 16;
-        ADDRESS_WIDTH : integer := 4;
+        ADDRESS_WIDTH : integer := 3;
         DEPTH : natural := 1024
     );
 end ProgramMemoryTest;
@@ -106,7 +106,7 @@ stimulus : process
     procedure write_inst(dIn : std_logic_vector(DATA_WIDTH-1 downto 0)) is
     begin
         data_in <= dIn;
-        address <= x"0";
+        address <= (others => '0');
         write_enable <= '1';
         wait until rising_edge(clock);
         write_enable <= '0';
@@ -114,7 +114,7 @@ stimulus : process
 
     procedure read_inst is
     begin
-        address <= x"0";
+        address <= (others => '0');
         read_enable <= '1';
         wait until rising_edge(clock);
         read_enable <= '0';
