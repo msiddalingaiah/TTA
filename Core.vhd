@@ -18,7 +18,7 @@
 --------------------------------------------------------------------------------
 -- Entity: Core
 -- Date: 2014-10-31
--- Author: user
+-- Author: Madhu
 --
 -- Description: 
 --------------------------------------------------------------------------------
@@ -31,7 +31,9 @@ use ieee.numeric_std.all;
 entity Core is
     port  (
         reset : in std_logic;
-        clock : in std_logic
+        clock : in std_logic;
+        load_en : in std_logic;
+        pm_data_in : in std_logic_vector ( 16 - 1 downto 0 )
     );
 end Core;
 
@@ -99,8 +101,8 @@ port map(
 );
 
 statemachine: block
-	type state_type is (IDLE, FETCH, DECODE, EXEC, DONE);
-    signal state : state_type := IDLE;
+	type state_type is (LOAD, FETCH, DECODE, EXEC, HALT);
+    signal state : state_type := LOAD;
     signal instruction, data_value : std_logic_vector( DATA_WIDTH - 1 downto 0 );
     signal dest_sub_system, src_sub_system : std_logic_vector( SUBSYSTEM_WIDTH - 1 downto 0 );
     signal short_immediate : std_logic_vector( SHORT_IMM_WIDTH - 1 downto 0 );
@@ -118,15 +120,21 @@ begin
         variable dest_unit, src_unit : integer;
 	begin
 		if reset = '1' then
-			state <= IDLE;
+			state <= LOAD;
 		elsif rising_edge(clock) then
-            read_enable(UNIT_PM) <= '0';
-            write_enable(UNIT_PM) <= '0';
+            read_enable <= (others => '0');
+            write_enable <= (others => '0');
 			case state is
-				when IDLE =>
-					state <= FETCH;
+				when LOAD =>
+				    if load_en = '0' then
+    					state <= FETCH;
+					else
+                        address(UNIT_PM) <= std_logic_vector(to_unsigned(1, address(UNIT_PM)'length));
+                        data_in(UNIT_PM) <= pm_data_in;
+                        write_enable(UNIT_PM) <= '1';
+					end if;
 				when FETCH =>
-				    address(UNIT_PM) <= std_logic_vector(to_unsigned(UNIT_PM, address(UNIT_PM)'length));
+				    address(UNIT_PM) <= std_logic_vector(to_unsigned(1, address(UNIT_PM)'length));
 				    read_enable(UNIT_PM) <= '1';
 				    instruction <= data_out(UNIT_PM);
                     state <= DECODE;
@@ -137,7 +145,7 @@ begin
                         if long_imm_flag = '0' then
                             data_value <= std_logic_vector(resize(signed(short_immediate), data_value'length));
                         else
-                            address(UNIT_PM) <= std_logic_vector(to_unsigned(UNIT_PM, address(UNIT_PM)'length));
+                            address(UNIT_PM) <= std_logic_vector(to_unsigned(1, address(UNIT_PM)'length));
                             read_enable(UNIT_PM) <= '1';
                             data_value <= data_out(UNIT_PM);
                         end if;
@@ -152,10 +160,9 @@ begin
                     write_enable(dest_unit) <= '1';
                     data_in(dest_unit) <= data_value;
                     state <= FETCH;
-				when DONE =>
-					state <= IDLE;
+				when HALT =>
 				when others =>
-					state <= IDLE;
+					state <= HALT;
 			end case;
 		end if;
 	end process;
