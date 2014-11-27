@@ -86,9 +86,10 @@ begin
     write_inst(x"0001");
     write_inst(x"0002");
     write_inst(x"0003");
-    write_inst(x"1c00");
-    write_inst(x"1c00");
-    write_inst(x"1c00");
+    write_inst(x"1a01");
+    write_inst(x"0005");
+    write_inst(x"0006");
+    write_inst(x"0007");
     wait for 200 ns;
     runSimulation <= '0';
 end process stimulus;

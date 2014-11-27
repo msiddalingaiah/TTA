@@ -73,8 +73,8 @@ architecture arch of Core is
     constant UNIT_PM : integer := 1;
     constant NUM_UNITS : integer := 8;
 
-    type DataBusArray is array (0 to NUM_UNITS-1) of std_logic_vector(DATA_WIDTH-1 downto 0);
-    type AddrBusArray is array (0 to NUM_UNITS-1) of std_logic_vector(SUBSYSTEM_WIDTH-1 downto 0);
+    type DataBusArray is array (NUM_UNITS-1 downto 0) of std_logic_vector(DATA_WIDTH-1 downto 0);
+    type AddrBusArray is array (NUM_UNITS-1 downto 0) of std_logic_vector(SUBSYSTEM_WIDTH-1 downto 0);
 
     signal data_in, data_out : DataBusArray;
     signal address : AddrBusArray;
@@ -103,7 +103,7 @@ port map(
 statemachine: block
 	type state_type is (LOAD, FETCH, DECODE, EXEC, HALT);
     signal state : state_type := LOAD;
-    signal instruction, data_value : std_logic_vector( DATA_WIDTH - 1 downto 0 );
+    signal instruction : std_logic_vector( DATA_WIDTH - 1 downto 0 );
     signal dest_sub_system, src_sub_system : std_logic_vector( SUBSYSTEM_WIDTH - 1 downto 0 );
     signal short_immediate : std_logic_vector( SHORT_IMM_WIDTH - 1 downto 0 );
     signal imm_flag, long_imm_flag : std_logic;
@@ -141,24 +141,24 @@ begin
                 when DECODE =>
                     state <= EXEC;
                     src_unit  := to_integer(unsigned(instruction(DEST_BASE - 1 downto UNIT_WIDTH)));
+                    dest_unit := to_integer(unsigned(instruction(DATA_WIDTH - 1 downto IMM_BIT+1)));
+                    address(dest_unit) <= dest_sub_system;
                     if imm_flag = '1' then
                         if long_imm_flag = '0' then
-                            data_value <= std_logic_vector(resize(signed(short_immediate), data_value'length));
+                            data_in(dest_unit) <= std_logic_vector(resize(signed(short_immediate), data_in(dest_unit)'length));
                         else
                             address(UNIT_PM) <= std_logic_vector(to_unsigned(1, address(UNIT_PM)'length));
                             read_enable(UNIT_PM) <= '1';
-                            data_value <= data_out(UNIT_PM);
+                            data_in(dest_unit) <= data_out(UNIT_PM);
                         end if;
                     else
                         address(src_unit) <= src_sub_system;
                         read_enable(src_unit) <= '1';
-                        data_value <= data_out(src_unit);
+                        data_in(dest_unit) <= data_out(src_unit);
                     end if;
                 when EXEC =>
                     dest_unit := to_integer(unsigned(instruction(DATA_WIDTH - 1 downto IMM_BIT+1)));
-                    address(dest_unit) <= dest_sub_system;
                     write_enable(dest_unit) <= '1';
-                    data_in(dest_unit) <= data_value;
                     state <= FETCH;
 				when HALT =>
 				when others =>
