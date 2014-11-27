@@ -1,0 +1,164 @@
+
+--------------------------------------------------------------------------------
+-- Copyright 2014 Madhu Siddalingaiah
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- Entity: Core
+-- Date: 2014-10-31
+-- Author: user
+--
+-- Description: 
+--------------------------------------------------------------------------------
+library ieee;
+use ieee.std_logic_1164.all;
+-- Avoid using ieee.std_logic_arith.all
+use ieee.std_logic_unsigned.all;
+use ieee.numeric_std.all;
+
+entity Core is
+    port  (
+        reset : in std_logic;
+        clock : in std_logic
+    );
+end Core;
+
+-- DDDD0ddd SSSS0sss
+-- DDDD1ddd 0xxxxxxx
+-- DDDD1ddd 10000000 xxxxxxxx xxxxxxxx
+
+architecture arch of Core is
+    component ProgramMemory
+        generic (
+            DATA_WIDTH : integer;
+            ADDRESS_WIDTH : integer;
+            DEPTH : natural
+        );
+        port (
+            reset : in std_logic;
+            clock : in std_logic;
+            address : in std_logic_vector ( ADDRESS_WIDTH - 1 downto 0 );
+            data_in : in std_logic_vector ( DATA_WIDTH - 1 downto 0 );
+            data_out : out std_logic_vector ( DATA_WIDTH - 1 downto 0 );
+            read_enable : in std_logic;
+            write_enable : in std_logic;
+            busy : out std_logic
+        );
+    end component;
+
+    constant DATA_WIDTH : integer := 16;
+    constant SUBSYSTEM_WIDTH : integer := 3;
+    constant PM_DEPTH : natural := 1024;
+
+    constant DEST_BASE : integer := 8;
+    constant UNIT_WIDTH : integer := 4;
+    constant IMM_BIT : integer := DEST_BASE+3;
+    constant SHORT_IMM_BIT : integer := DEST_BASE-1;
+    constant SHORT_IMM_WIDTH : integer := SHORT_IMM_BIT-1;
+
+    constant UNIT_PM : integer := 1;
+    constant NUM_UNITS : integer := 8;
+
+    type DataBusArray is array (0 to NUM_UNITS-1) of std_logic_vector(DATA_WIDTH-1 downto 0);
+    type AddrBusArray is array (0 to NUM_UNITS-1) of std_logic_vector(SUBSYSTEM_WIDTH-1 downto 0);
+
+    signal data_in, data_out : DataBusArray;
+    signal address : AddrBusArray;
+    signal read_enable, write_enable, busy : std_logic_vector(0 to NUM_UNITS-1);
+ 
+    signal l_reset, l_clock : std_logic;
+begin
+
+pm : ProgramMemory
+generic map(
+    DATA_WIDTH    => DATA_WIDTH,
+    ADDRESS_WIDTH => SUBSYSTEM_WIDTH,
+    DEPTH         => PM_DEPTH
+)
+port map(
+    reset         => l_reset,
+    clock         => l_clock,
+    address       => address(UNIT_PM),
+    data_in       => data_in(UNIT_PM),
+    data_out      => data_out(UNIT_PM),
+    read_enable   => read_enable(UNIT_PM),
+    write_enable  => write_enable(UNIT_PM),
+    busy          => busy(UNIT_PM)
+);
+
+statemachine: block
+	type state_type is (IDLE, FETCH, DECODE, EXEC, DONE);
+    signal state : state_type := IDLE;
+    signal instruction, data_value : std_logic_vector( DATA_WIDTH - 1 downto 0 );
+    signal dest_sub_system, src_sub_system : std_logic_vector( SUBSYSTEM_WIDTH - 1 downto 0 );
+    signal short_immediate : std_logic_vector( SHORT_IMM_WIDTH - 1 downto 0 );
+    signal imm_flag, long_imm_flag : std_logic;
+begin
+    l_reset <= reset;
+    l_clock <= clock;
+    imm_flag <= instruction(IMM_BIT);
+    long_imm_flag <= instruction(SHORT_IMM_BIT);
+    short_immediate <= instruction(SHORT_IMM_WIDTH - 1 downto 0);
+    dest_sub_system <= instruction(IMM_BIT - 1 downto DEST_BASE);
+    src_sub_system <= instruction(SUBSYSTEM_WIDTH - 1 downto 0);
+    
+	process(clock, reset)
+        variable dest_unit, src_unit : integer;
+	begin
+		if reset = '1' then
+			state <= IDLE;
+		elsif rising_edge(clock) then
+            read_enable(UNIT_PM) <= '0';
+            write_enable(UNIT_PM) <= '0';
+			case state is
+				when IDLE =>
+					state <= FETCH;
+				when FETCH =>
+				    address(UNIT_PM) <= std_logic_vector(to_unsigned(UNIT_PM, address(UNIT_PM)'length));
+				    read_enable(UNIT_PM) <= '1';
+				    instruction <= data_out(UNIT_PM);
+                    state <= DECODE;
+                when DECODE =>
+                    state <= EXEC;
+                    src_unit  := to_integer(unsigned(instruction(DEST_BASE - 1 downto UNIT_WIDTH)));
+                    if imm_flag = '1' then
+                        if long_imm_flag = '0' then
+                            data_value <= std_logic_vector(resize(signed(short_immediate), data_value'length));
+                        else
+                            address(UNIT_PM) <= std_logic_vector(to_unsigned(UNIT_PM, address(UNIT_PM)'length));
+                            read_enable(UNIT_PM) <= '1';
+                            data_value <= data_out(UNIT_PM);
+                        end if;
+                    else
+                        address(src_unit) <= src_sub_system;
+                        read_enable(src_unit) <= '1';
+                        data_value <= data_out(src_unit);
+                    end if;
+                when EXEC =>
+                    dest_unit := to_integer(unsigned(instruction(DATA_WIDTH - 1 downto IMM_BIT+1)));
+                    address(dest_unit) <= dest_sub_system;
+                    write_enable(dest_unit) <= '1';
+                    data_in(dest_unit) <= data_value;
+                    state <= FETCH;
+				when DONE =>
+					state <= IDLE;
+				when others =>
+					state <= IDLE;
+			end case;
+		end if;
+	end process;
+end block;
+
+end arch;
