@@ -32,7 +32,7 @@ entity ProgramMemory is
 	generic  (
 		DATA_WIDTH : integer := 16;
         ADDRESS_WIDTH : integer := 3;
-		DEPTH : natural := 1024
+		DEPTH : natural := 16
 	);
 	port  (
 		reset : in std_logic;
@@ -42,7 +42,10 @@ entity ProgramMemory is
         data_out : out std_logic_vector(DATA_WIDTH-1 downto 0);
         read_enable : in std_logic;
         write_enable : in std_logic;
-        busy : out std_logic
+        busy : out std_logic;
+
+        code_read_enable : in std_logic;
+        code_data_out : out std_logic_vector(DATA_WIDTH-1 downto 0)
 	);
 end ProgramMemory;
 
@@ -72,11 +75,17 @@ begin
             write_counter <= (others => '0');
             data_out <= (others => '0');
             busy <= '0';
+            code_data_out <= (others => '0');
 		elsif rising_edge(clock) then
+            code_data_out <= (others => '0');
 			case state is
 				when IDLE =>
 					state <= RUNNING;
 				when RUNNING =>
+                    if code_read_enable = '1' then
+                        code_data_out <= store(to_integer(unsigned(program_counter)));
+                        program_counter <= program_counter + 1;
+                    end if;
 				    if read_enable = '1' then
                         case to_integer(unsigned(local_address)) is
                             -- NOP
@@ -84,7 +93,6 @@ begin
                             -- Read instruction
                             when 1 =>
                                 data_out <= store(to_integer(unsigned(program_counter)));
-                                program_counter <= program_counter + 1;
                             -- Read program counter
                             when 2 =>
                                 data_out <= program_counter;

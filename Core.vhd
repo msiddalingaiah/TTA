@@ -32,8 +32,10 @@ entity Core is
     port  (
         reset : in std_logic;
         clock : in std_logic;
-        load_en : in std_logic;
-        pm_data_in : in std_logic_vector ( 16 - 1 downto 0 )
+        load_enable : in std_logic;
+        run_enable : in std_logic;
+        pm_data_in : in std_logic_vector ( 16 - 1 downto 0 );
+        halt_flag : out std_logic
     );
 end Core;
 
@@ -56,13 +58,16 @@ architecture arch of Core is
             data_out : out std_logic_vector ( DATA_WIDTH - 1 downto 0 );
             read_enable : in std_logic;
             write_enable : in std_logic;
-            busy : out std_logic
+            busy : out std_logic;
+
+            code_read_enable : in std_logic;
+            code_data_out : out std_logic_vector(DATA_WIDTH-1 downto 0)
         );
     end component;
 
     constant DATA_WIDTH : integer := 16;
     constant SUBSYSTEM_WIDTH : integer := 3;
-    constant PM_DEPTH : natural := 1024;
+    constant PM_DEPTH : natural := 10;
 
     constant DEST_BASE : integer := 8;
     constant UNIT_WIDTH : integer := 4;
@@ -71,7 +76,7 @@ architecture arch of Core is
     constant SHORT_IMM_WIDTH : integer := SHORT_IMM_BIT-1;
 
     constant UNIT_PM : integer := 1;
-    constant NUM_UNITS : integer := 8;
+    constant NUM_UNITS : integer := 16;
 
     type DataBusArray is array (NUM_UNITS-1 downto 0) of std_logic_vector(DATA_WIDTH-1 downto 0);
     type AddrBusArray is array (NUM_UNITS-1 downto 0) of std_logic_vector(SUBSYSTEM_WIDTH-1 downto 0);
@@ -79,8 +84,9 @@ architecture arch of Core is
     signal data_in, data_out : DataBusArray;
     signal address : AddrBusArray;
     signal read_enable, write_enable, busy : std_logic_vector(0 to NUM_UNITS-1);
- 
-    signal l_reset, l_clock : std_logic;
+
+    signal code_data_out : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal l_reset, l_clock, code_read_enable : std_logic;
 begin
 
 pm : ProgramMemory
@@ -97,11 +103,13 @@ port map(
     data_out      => data_out(UNIT_PM),
     read_enable   => read_enable(UNIT_PM),
     write_enable  => write_enable(UNIT_PM),
-    busy          => busy(UNIT_PM)
+    busy          => busy(UNIT_PM),
+    code_read_enable => code_read_enable,
+    code_data_out => code_data_out
 );
 
 statemachine: block
-	type state_type is (LOAD, FETCH, DECODE, EXEC, HALT);
+	type state_type is (LOAD, PREFETCH, EXEC, HALT);
     signal state : state_type := LOAD;
     signal instruction : std_logic_vector( DATA_WIDTH - 1 downto 0 );
     signal dest_sub_system, src_sub_system : std_logic_vector( SUBSYSTEM_WIDTH - 1 downto 0 );
@@ -121,46 +129,54 @@ begin
 	begin
 		if reset = '1' then
 			state <= LOAD;
+			halt_flag <= '0';
+            code_read_enable <= '0';
+            read_enable <= (others => '0');
+            write_enable <= (others => '0');
+            instruction <= (others => '0');
 		elsif rising_edge(clock) then
             read_enable <= (others => '0');
             write_enable <= (others => '0');
 			case state is
 				when LOAD =>
-				    if load_en = '0' then
-    					state <= FETCH;
-					else
+				    if load_enable = '0' and run_enable = '1' then
+    					state <= PREFETCH;
+					elsif load_enable = '1' then
                         address(UNIT_PM) <= std_logic_vector(to_unsigned(1, address(UNIT_PM)'length));
                         data_in(UNIT_PM) <= pm_data_in;
                         write_enable(UNIT_PM) <= '1';
 					end if;
-				when FETCH =>
-				    address(UNIT_PM) <= std_logic_vector(to_unsigned(1, address(UNIT_PM)'length));
-				    read_enable(UNIT_PM) <= '1';
-				    instruction <= data_out(UNIT_PM);
-                    state <= DECODE;
-                when DECODE =>
+                when PREFETCH =>
                     state <= EXEC;
-                    src_unit  := to_integer(unsigned(instruction(DEST_BASE - 1 downto UNIT_WIDTH)));
-                    dest_unit := to_integer(unsigned(instruction(DATA_WIDTH - 1 downto IMM_BIT+1)));
-                    address(dest_unit) <= dest_sub_system;
-                    if imm_flag = '1' then
-                        if long_imm_flag = '0' then
-                            data_in(dest_unit) <= std_logic_vector(resize(signed(short_immediate), data_in(dest_unit)'length));
-                        else
-                            address(UNIT_PM) <= std_logic_vector(to_unsigned(1, address(UNIT_PM)'length));
-                            read_enable(UNIT_PM) <= '1';
-                            data_in(dest_unit) <= data_out(UNIT_PM);
-                        end if;
+                    code_read_enable <= '1';
+                    instruction <= code_data_out;
+				when EXEC =>
+                    instruction <= code_data_out;
+                    if to_integer(unsigned(instruction(DATA_WIDTH - 1 downto 0))) = 1 then
+                        state <= HALT;
                     else
-                        address(src_unit) <= src_sub_system;
-                        read_enable(src_unit) <= '1';
-                        data_in(dest_unit) <= data_out(src_unit);
+                        state <= EXEC;
+                        src_unit  := to_integer(unsigned(instruction(DEST_BASE - 1 downto UNIT_WIDTH)));
+                        dest_unit := to_integer(unsigned(instruction(DATA_WIDTH - 1 downto IMM_BIT+1)));
+                        address(dest_unit) <= dest_sub_system;
+                        if imm_flag = '1' then
+                            if long_imm_flag = '0' then
+                                data_in(dest_unit) <= std_logic_vector(resize(signed(short_immediate), data_in(dest_unit)'length));
+                            else
+                                address(UNIT_PM) <= std_logic_vector(to_unsigned(1, address(UNIT_PM)'length));
+                                read_enable(UNIT_PM) <= '1';
+                                data_in(dest_unit) <= data_out(UNIT_PM);
+                            end if;
+                        else
+                            address(src_unit) <= src_sub_system;
+                            read_enable(src_unit) <= '1';
+                            data_in(dest_unit) <= data_out(src_unit);
+                        end if;
+                        write_enable(dest_unit) <= '1';
                     end if;
-                when EXEC =>
-                    dest_unit := to_integer(unsigned(instruction(DATA_WIDTH - 1 downto IMM_BIT+1)));
-                    write_enable(dest_unit) <= '1';
-                    state <= FETCH;
 				when HALT =>
+                    instruction <= (others => '0');
+                    halt_flag <= '1';
 				when others =>
 					state <= HALT;
 			end case;

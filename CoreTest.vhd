@@ -36,24 +36,28 @@ architecture arch of CoreTest is
         port (
             reset : in std_logic;
             clock : in std_logic;
-            load_en : in std_logic;
-            pm_data_in : in std_logic_vector ( 16 - 1 downto 0 )
+            load_enable : in std_logic;
+            run_enable : in std_logic;
+            pm_data_in : in std_logic_vector ( 16 - 1 downto 0 );
+            halt_flag : out std_logic
         );
     end component;
 
     signal reset : std_logic := '0';
     signal clock : std_logic := '0';
-    signal load_en : std_logic := '0';
+    signal load_enable, run_enable, halt_flag : std_logic := '0';
     signal pm_data_in : std_logic_vector ( 16 - 1 downto 0 );
     signal runSimulation : std_logic := '1';
 begin
 
 c : Core
 port map(
-    reset      => reset,
-    clock      => clock,
-    load_en    => load_en,
-    pm_data_in => pm_data_in
+    reset       => reset,
+    clock       => clock,
+    load_enable => load_enable,
+    run_enable  => run_enable,
+    pm_data_in  => pm_data_in,
+    halt_flag   => halt_flag
 );
 
 process begin
@@ -67,7 +71,8 @@ end process;
 stimulus : process
     procedure doReset is begin
         pm_data_in <= (others => '0');
-        load_en <= '0';
+        load_enable <= '0';
+        run_enable <= '0';
         wait for 2 ns;
         reset <= '1';
         wait for 6 ns;
@@ -76,22 +81,24 @@ stimulus : process
 
     procedure write_inst(dIn : std_logic_vector(16-1 downto 0)) is
     begin
-        pm_data_in <= dIn;
-        load_en <= '1';
         wait until rising_edge(clock);
-        load_en <= '0';
+        pm_data_in <= dIn;
     end write_inst;
 begin
     doReset;
+    load_enable <= '1';
+    write_inst(x"f001");
+    write_inst(x"f802");
+    write_inst(x"f003");
+    write_inst(x"1c04");
     write_inst(x"0001");
-    write_inst(x"0002");
-    write_inst(x"0003");
-    write_inst(x"1a01");
-    write_inst(x"0005");
-    write_inst(x"0006");
-    write_inst(x"0007");
-    wait for 200 ns;
+    write_inst(x"0000");
+    write_inst(x"0000");
+    load_enable <= '0';
+    run_enable <= '1';
+    wait until halt_flag = '1';
     runSimulation <= '0';
+    wait;
 end process stimulus;
 
 end arch;
