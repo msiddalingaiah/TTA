@@ -56,11 +56,8 @@ signal store : MemoryType;
 signal program_counter : std_logic_vector(DATA_WIDTH-1 downto 0);
 signal jump_register : std_logic_vector(DATA_WIDTH-1 downto 0);
 signal write_counter : std_logic_vector(DATA_WIDTH-1 downto 0);
-signal local_address : std_logic_vector(ADDRESS_WIDTH-1 downto 0);
 
 begin
-
-local_address <= address(local_address'length-1 downto 0);
 
 statemachine: block
 	type state_type is (IDLE, RUNNING, DONE);
@@ -87,7 +84,7 @@ begin
                         program_counter <= program_counter + 1;
                     end if;
 				    if read_enable = '1' then
-                        case to_integer(unsigned(local_address)) is
+                        case to_integer(unsigned(address)) is
                             -- NOP
                             when 0 =>
                             -- Read instruction
@@ -106,7 +103,7 @@ begin
                             
                         end case;
 				    elsif write_enable = '1' then
-                        case to_integer(unsigned(local_address)) is
+                        case to_integer(unsigned(address)) is
                             -- NOP
                             when 0 =>
                             -- Write instruction
@@ -124,12 +121,12 @@ begin
                                 jump_register <= data_in;
                             -- Jump if zero
                             when 5 =>
-                                if ieee.std_logic_unsigned."=" (data_in, x"0000") then
+                                if to_integer(unsigned(data_in)) = 0 then
                                     program_counter <= jump_register;
                                 end if;
                             -- Jump if non-zero
                             when 6 =>
-                                if ieee.std_logic_unsigned."/=" (data_in, x"0000") then
+                                if to_integer(unsigned(data_in)) /= 0 then
                                     program_counter <= jump_register;
                                 end if;
                             when others =>

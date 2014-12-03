@@ -90,13 +90,15 @@ begin
     write_inst(x"f001");
     write_inst(x"f802");
     write_inst(x"f003");
-    write_inst(x"1c04");
+    write_inst(x"1a00");
+    write_inst(x"f004");
     write_inst(x"0001");
     write_inst(x"0000");
     write_inst(x"0000");
     load_enable <= '0';
     run_enable <= '1';
-    wait until halt_flag = '1';
+    wait for 200 ns;
+--    wait until halt_flag = '1';
     runSimulation <= '0';
     wait;
 end process stimulus;

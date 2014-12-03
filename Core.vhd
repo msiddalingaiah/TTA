@@ -85,7 +85,7 @@ architecture arch of Core is
     signal address : AddrBusArray;
     signal read_enable, write_enable, busy : std_logic_vector(0 to NUM_UNITS-1);
 
-    signal code_data_out : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal instruction, code_data_out : std_logic_vector(DATA_WIDTH-1 downto 0);
     signal l_reset, l_clock, code_read_enable : std_logic;
 begin
 
@@ -105,13 +105,12 @@ port map(
     write_enable  => write_enable(UNIT_PM),
     busy          => busy(UNIT_PM),
     code_read_enable => code_read_enable,
-    code_data_out => code_data_out
+    code_data_out => instruction
 );
 
 statemachine: block
 	type state_type is (LOAD, PREFETCH, EXEC, HALT);
     signal state : state_type := LOAD;
-    signal instruction : std_logic_vector( DATA_WIDTH - 1 downto 0 );
     signal dest_sub_system, src_sub_system : std_logic_vector( SUBSYSTEM_WIDTH - 1 downto 0 );
     signal short_immediate : std_logic_vector( SHORT_IMM_WIDTH - 1 downto 0 );
     signal imm_flag, long_imm_flag : std_logic;
@@ -133,7 +132,6 @@ begin
             code_read_enable <= '0';
             read_enable <= (others => '0');
             write_enable <= (others => '0');
-            instruction <= (others => '0');
 		elsif rising_edge(clock) then
             read_enable <= (others => '0');
             write_enable <= (others => '0');
@@ -149,9 +147,7 @@ begin
                 when PREFETCH =>
                     state <= EXEC;
                     code_read_enable <= '1';
-                    instruction <= code_data_out;
 				when EXEC =>
-                    instruction <= code_data_out;
                     if to_integer(unsigned(instruction(DATA_WIDTH - 1 downto 0))) = 1 then
                         state <= HALT;
                     else
@@ -175,7 +171,6 @@ begin
                         write_enable(dest_unit) <= '1';
                     end if;
 				when HALT =>
-                    instruction <= (others => '0');
                     halt_flag <= '1';
 				when others =>
 					state <= HALT;
