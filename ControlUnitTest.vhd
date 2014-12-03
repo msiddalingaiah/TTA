@@ -33,6 +33,10 @@ end ControlUnitTest;
 
 architecture arch of ControlUnitTest is
     component ControlUnit
+        generic  (
+            DATA_WIDTH : integer;
+            PM_DEPTH : natural
+        );
         port (
             reset : in std_logic;
             clock : in std_logic;
@@ -51,6 +55,10 @@ architecture arch of ControlUnitTest is
 begin
 
 c : ControlUnit
+generic map(
+    DATA_WIDTH  => 16,
+    PM_DEPTH       => 16
+)
 port map(
     reset       => reset,
     clock       => clock,

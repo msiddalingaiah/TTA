@@ -29,6 +29,10 @@ use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
 entity ControlUnit is
+    generic  (
+        DATA_WIDTH : integer := 16;
+        PM_DEPTH : natural := 16
+    );
     port  (
         reset : in std_logic;
         clock : in std_logic;
@@ -65,9 +69,25 @@ architecture arch of ControlUnit is
         );
     end component;
 
-    constant DATA_WIDTH : integer := 16;
+    component ArithmeticUnit
+        generic (
+            DATA_WIDTH : integer;
+            ADDRESS_WIDTH : integer;
+            DEPTH : natural
+        );
+        port (
+            reset : in std_logic;
+            clock : in std_logic;
+            address : in std_logic_vector ( ADDRESS_WIDTH - 1 downto 0 );
+            data_in : in std_logic_vector ( DATA_WIDTH - 1 downto 0 );
+            data_out : out std_logic_vector ( DATA_WIDTH - 1 downto 0 );
+            read_enable : in std_logic;
+            write_enable : in std_logic;
+            busy : out std_logic
+        );
+    end component;
+
     constant SUBSYSTEM_WIDTH : integer := 3;
-    constant PM_DEPTH : natural := 10;
 
     constant DEST_BASE : integer := 8;
     constant UNIT_WIDTH : integer := 4;
@@ -76,6 +96,7 @@ architecture arch of ControlUnit is
     constant SHORT_IMM_WIDTH : integer := SHORT_IMM_BIT-1;
 
     constant UNIT_PM : integer := 1;
+    constant UNIT_ARITH : integer := 2;
     constant NUM_UNITS : integer := 16;
 
     type DataBusArray is array (NUM_UNITS-1 downto 0) of std_logic_vector(DATA_WIDTH-1 downto 0);
@@ -106,6 +127,23 @@ port map(
     busy          => busy(UNIT_PM),
     code_read_enable => code_read_enable,
     code_data_out => instruction
+);
+
+au : ArithmeticUnit
+generic map(
+    DATA_WIDTH    => DATA_WIDTH,
+    ADDRESS_WIDTH => SUBSYSTEM_WIDTH,
+    DEPTH         => 32
+)
+port map(
+    reset         => l_reset,
+    clock         => l_clock,
+    address       => address(UNIT_ARITH),
+    data_in       => data_in(UNIT_ARITH),
+    data_out      => data_out(UNIT_ARITH),
+    read_enable   => read_enable(UNIT_ARITH),
+    write_enable  => write_enable(UNIT_ARITH),
+    busy          => busy(UNIT_ARITH)
 );
 
 statemachine: block
