@@ -1,6 +1,6 @@
 
 ghdl -a --ieee=synopsys ProgramMemory.vhd
-ghdl -a --ieee=synopsys Core.vhd
-ghdl -a --ieee=synopsys CoreTest.vhd
-ghdl -e --ieee=synopsys CoreTest
-ghdl -r --ieee=synopsys CoreTest --wave=coretest.ghw
+ghdl -a --ieee=synopsys ControlUnit.vhd
+ghdl -a --ieee=synopsys ControlUnitTest.vhd
+ghdl -e --ieee=synopsys ControlUnitTest
+ghdl -r --ieee=synopsys ControlUnitTest --wave=controlunit.ghw

@@ -16,7 +16,7 @@
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- Entity: CoreTest
+-- Entity: ControlUnitTest
 -- Date: 2014-11-26
 -- Author: Madhu
 --
@@ -28,11 +28,11 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
-entity CoreTest is
-end CoreTest;
+entity ControlUnitTest is
+end ControlUnitTest;
 
-architecture arch of CoreTest is
-    component Core
+architecture arch of ControlUnitTest is
+    component ControlUnit
         port (
             reset : in std_logic;
             clock : in std_logic;
@@ -50,7 +50,7 @@ architecture arch of CoreTest is
     signal runSimulation : std_logic := '1';
 begin
 
-c : Core
+c : ControlUnit
 port map(
     reset       => reset,
     clock       => clock,

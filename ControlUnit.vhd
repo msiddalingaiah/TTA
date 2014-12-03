@@ -16,7 +16,7 @@
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- Entity: Core
+-- Entity: ControlUnit
 -- Date: 2014-10-31
 -- Author: Madhu
 --
@@ -28,7 +28,7 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use ieee.numeric_std.all;
 
-entity Core is
+entity ControlUnit is
     port  (
         reset : in std_logic;
         clock : in std_logic;
@@ -37,13 +37,13 @@ entity Core is
         pm_data_in : in std_logic_vector ( 16 - 1 downto 0 );
         halt_flag : out std_logic
     );
-end Core;
+end ControlUnit;
 
 -- DDDD0ddd SSSS0sss
 -- DDDD1ddd 0xxxxxxx
 -- DDDD1ddd 10000000 xxxxxxxx xxxxxxxx
 
-architecture arch of Core is
+architecture arch of ControlUnit is
     component ProgramMemory
         generic (
             DATA_WIDTH : integer;
