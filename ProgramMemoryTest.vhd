@@ -31,7 +31,7 @@ use ieee.numeric_std.all;
 entity ProgramMemoryTest is
     generic  (
         DATA_WIDTH : integer := 16;
-        ADDRESS_WIDTH : integer := 3;
+        ADDRESS_WIDTH : integer := 16;
         DEPTH : natural := 1024
     );
 end ProgramMemoryTest;
@@ -46,23 +46,23 @@ architecture arch of ProgramMemoryTest is
         port (
             reset : in std_logic;
             clock : in std_logic;
-            address : in std_logic_vector(ADDRESS_WIDTH-1 downto 0);
             data_in : in std_logic_vector(DATA_WIDTH-1 downto 0);
+            pc_in : in std_logic_vector(ADDRESS_WIDTH-1 downto 0);
             data_out : out std_logic_vector(DATA_WIDTH-1 downto 0);
-            read_enable : in std_logic;
-            write_enable : in std_logic;
-            busy : out std_logic
+            pc_out : out std_logic_vector(ADDRESS_WIDTH-1 downto 0);
+            memory_write : in std_logic;
+            pc_write : in std_logic
         );
     end component;
 
     signal reset : std_logic := '0';
     signal clock : std_logic := '0';
-    signal address : std_logic_vector (ADDRESS_WIDTH - 1 downto 0 );
     signal data_in : std_logic_vector (DATA_WIDTH - 1 downto 0 );
+    signal pc_in : std_logic_vector (ADDRESS_WIDTH - 1 downto 0 );
     signal data_out : std_logic_vector (DATA_WIDTH - 1 downto 0 );
-    signal read_enable : std_logic;
-    signal write_enable : std_logic;
-    signal busy : std_logic;
+    signal pc_out : std_logic_vector (ADDRESS_WIDTH - 1 downto 0 );
+    signal memory_write : std_logic;
+    signal pc_write : std_logic;
     signal runSimulation : std_logic := '1';
 begin
 
@@ -75,12 +75,12 @@ generic map(
 port map(
     reset      => reset,
     clock      => clock,
-    address  => address,
-    data_in  => data_in,
-    data_out    => data_out,
-    read_enable => read_enable,
-    write_enable => write_enable,
-    busy => busy
+    data_in    => data_in,
+    pc_in      => pc_in,
+    data_out   => data_out,
+    pc_out     => pc_out,
+    memory_write => memory_write,
+    pc_write   => pc_write
 );
 
 process begin
@@ -93,10 +93,10 @@ end process;
 
 stimulus : process
     procedure doReset is begin
-        address <= (others => '0');
+        pc_in <= (others => '0');
         data_in <= (others => '0');
-        read_enable <= '0';
-        write_enable <= '0';
+        pc_write <= '0';
+        memory_write <= '0';
         wait for 2 ns;
         reset <= '1';
         wait for 6 ns;
@@ -106,19 +106,10 @@ stimulus : process
     procedure write_inst(dIn : std_logic_vector(DATA_WIDTH-1 downto 0)) is
     begin
         data_in <= dIn;
-        address <= (others => '0');
-        write_enable <= '1';
+        memory_write <= '1';
         wait until rising_edge(clock);
-        write_enable <= '0';
+        memory_write <= '0';
     end write_inst;
-
-    procedure read_inst is
-    begin
-        address <= (others => '0');
-        read_enable <= '1';
-        wait until rising_edge(clock);
-        read_enable <= '0';
-    end read_inst;
 begin
     doReset;
     wait until rising_edge(clock);
@@ -126,11 +117,18 @@ begin
     write_inst(x"000b");
     write_inst(x"000c");
     write_inst(x"000d");
-    read_inst;
-    read_inst;
-    read_inst;
-    read_inst;
-    read_inst;
+
+    pc_in <= (others => '0');
+    pc_write <= '1';
+    wait until rising_edge(clock);
+    pc_write <= '0';
+
+    wait until rising_edge(clock);
+    wait until rising_edge(clock);
+    wait until rising_edge(clock);
+    wait until rising_edge(clock);
+    wait until rising_edge(clock);
+
     runSimulation <= '0';
     wait;
 end process stimulus;

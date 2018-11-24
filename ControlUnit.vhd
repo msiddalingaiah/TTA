@@ -43,9 +43,10 @@ entity ControlUnit is
     );
 end ControlUnit;
 
--- DDDD0ddd SSSS0sss
--- DDDD1ddd 0xxxxxxx
--- DDDD1ddd 10000000 xxxxxxxx xxxxxxxx
+-- f ddddddd ssssssss
+-- 1 module  module
+-- 0 module  immediate
+-- module 0 - prefix
 
 architecture arch of ControlUnit is
     component ProgramMemory
@@ -57,15 +58,12 @@ architecture arch of ControlUnit is
         port (
             reset : in std_logic;
             clock : in std_logic;
-            address : in std_logic_vector ( ADDRESS_WIDTH - 1 downto 0 );
-            data_in : in std_logic_vector ( DATA_WIDTH - 1 downto 0 );
-            data_out : out std_logic_vector ( DATA_WIDTH - 1 downto 0 );
-            read_enable : in std_logic;
-            write_enable : in std_logic;
-            busy : out std_logic;
-
-            code_read_enable : in std_logic;
-            code_data_out : out std_logic_vector(DATA_WIDTH-1 downto 0)
+            data_in : in std_logic_vector(DATA_WIDTH-1 downto 0);
+            pc_in : in std_logic_vector(ADDRESS_WIDTH-1 downto 0);
+            data_out : out std_logic_vector(DATA_WIDTH-1 downto 0);
+            pc_out : out std_logic_vector(ADDRESS_WIDTH-1 downto 0);
+            memory_write : in std_logic;
+            pc_write : in std_logic
         );
     end component;
 
@@ -109,25 +107,6 @@ architecture arch of ControlUnit is
     signal instruction, code_data_out : std_logic_vector(DATA_WIDTH-1 downto 0);
     signal l_reset, l_clock, code_read_enable : std_logic;
 begin
-
-pm : ProgramMemory
-generic map(
-    DATA_WIDTH    => DATA_WIDTH,
-    ADDRESS_WIDTH => SUBSYSTEM_WIDTH,
-    DEPTH         => PM_DEPTH
-)
-port map(
-    reset         => l_reset,
-    clock         => l_clock,
-    address       => address(UNIT_PM),
-    data_in       => data_in(UNIT_PM),
-    data_out      => data_out(UNIT_PM),
-    read_enable   => read_enable(UNIT_PM),
-    write_enable  => write_enable(UNIT_PM),
-    busy          => busy(UNIT_PM),
-    code_read_enable => code_read_enable,
-    code_data_out => instruction
-);
 
 au : ArithmeticUnit
 generic map(

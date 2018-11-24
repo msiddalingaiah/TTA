@@ -31,21 +31,18 @@ use ieee.numeric_std.all;
 entity ProgramMemory is
 	generic  (
 		DATA_WIDTH : integer := 16;
-        ADDRESS_WIDTH : integer := 3;
-		DEPTH : natural := 16
+        ADDRESS_WIDTH : integer := 16;
+		DEPTH : natural := 8192
 	);
 	port  (
 		reset : in std_logic;
 		clock : in std_logic;
-        address : in std_logic_vector(ADDRESS_WIDTH-1 downto 0);
         data_in : in std_logic_vector(DATA_WIDTH-1 downto 0);
+        pc_in : in std_logic_vector(ADDRESS_WIDTH-1 downto 0);
         data_out : out std_logic_vector(DATA_WIDTH-1 downto 0);
-        read_enable : in std_logic;
-        write_enable : in std_logic;
-        busy : out std_logic;
-
-        code_read_enable : in std_logic;
-        code_data_out : out std_logic_vector(DATA_WIDTH-1 downto 0)
+        pc_out : out std_logic_vector(ADDRESS_WIDTH-1 downto 0);
+        memory_write : in std_logic;
+        pc_write : in std_logic
 	);
 end ProgramMemory;
 
@@ -53,92 +50,31 @@ architecture arch of ProgramMemory is
 
 type MemoryType is array (0 to DEPTH-1) of std_logic_vector(DATA_WIDTH-1 downto 0);
 signal store : MemoryType;
-signal program_counter : std_logic_vector(DATA_WIDTH-1 downto 0);
-signal jump_register : std_logic_vector(DATA_WIDTH-1 downto 0);
-signal write_counter : std_logic_vector(DATA_WIDTH-1 downto 0);
+-- Initialization to '0' avoids NUMERIC_STD.TO_INTEGER: metavalue detected, returning 0
+signal program_counter : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
 
 begin
 
-statemachine: block
-	type state_type is (IDLE, RUNNING, DONE);
-	signal state : state_type := IDLE;
+top: block
 begin
+    -- Asynchronous assignments
+    pc_out <= program_counter;
+    data_out <= store(to_integer(unsigned(program_counter)));
+    
 	process(clock, reset)
 	begin
 		if reset = '1' then
-			state <= IDLE;
             program_counter <= (others => '0');
-            jump_register <= (others => '0');
-            write_counter <= (others => '0');
-            data_out <= (others => '0');
-            busy <= '0';
-            code_data_out <= (others => '0');
 		elsif rising_edge(clock) then
-            code_data_out <= (others => '0');
-			case state is
-				when IDLE =>
-					state <= RUNNING;
-				when RUNNING =>
-                    if code_read_enable = '1' then
-                        code_data_out <= store(to_integer(unsigned(program_counter)));
-                        program_counter <= program_counter + 1;
-                    end if;
-				    if read_enable = '1' then
-                        case to_integer(unsigned(address)) is
-                            -- NOP
-                            when 0 =>
-                            -- Read instruction
-                            when 1 =>
-                                data_out <= store(to_integer(unsigned(program_counter)));
-                            -- Read program counter
-                            when 2 =>
-                                data_out <= program_counter;
-                            -- Read write counter
-                            when 3 =>
-                                data_out <= write_counter;
-                            -- Read jump register
-                            when 4 =>
-                                data_out <= jump_register;
-                            when others =>
-                            
-                        end case;
-				    elsif write_enable = '1' then
-                        case to_integer(unsigned(address)) is
-                            -- NOP
-                            when 0 =>
-                            -- Write instruction
-                            when 1 =>
-                                store(to_integer(unsigned(write_counter))) <= data_in;
-                                write_counter <= write_counter + 1;
-                            -- Write program counter
-                            when 2 =>
-                                program_counter <= data_in;
-                            -- Write write counter
-                            when 3 =>
-                                write_counter <= data_in;
-                            -- Write write counter
-                            when 4 =>
-                                jump_register <= data_in;
-                            -- Jump if zero
-                            when 5 =>
-                                if to_integer(unsigned(data_in)) = 0 then
-                                    program_counter <= jump_register;
-                                end if;
-                            -- Jump if non-zero
-                            when 6 =>
-                                if to_integer(unsigned(data_in)) /= 0 then
-                                    program_counter <= jump_register;
-                                end if;
-                            when others =>
-                            
-                        end case;
-				    end if;
-				when DONE =>
-					state <= IDLE;
-				when others =>
-					state <= IDLE;
-			end case;
-		end if;
+            if pc_write = '1' then
+                program_counter <= pc_in;
+            else
+                program_counter <= program_counter + 1;
+            end if;
+            if memory_write = '1' then
+                store(to_integer(unsigned(program_counter))) <= data_in;
+            end if;
+        end if;
 	end process;
 end block;
 
